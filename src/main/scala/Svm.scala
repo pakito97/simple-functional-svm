@@ -31,26 +31,29 @@ object Data {
 }
 
 object Plotter {
-  def apply(x: DataFrame[Double], labels: Vector[Int]): Unit = {
+  implicit def toVec[F <: Iterable[_]](x: F): Vector[_] = x.toVector
+
+  def apply[T: Numeric, F[_] <: Iterable[_]](x: DataFrame[Double], labels: F[T]): Unit = {
     val f = Figure()
     val p = f.subplot(0)
 
     val x1 = (x, labels).zipped.filter((_, b) => b == -1)._1
     val x2 = (x, labels).zipped.filter((_, b) => b == 1)._1
 
-
     p += plot(x1.map(_.head), x1.map(_.last), '.', "b")
     p += plot(x2.map(_.head), x2.map(_.last), '.', "r")
-//    p += plot(List( 5.0, 8.0), List(w(0) * 5, w(0) * 8))
+////    p += plot(List( 5.0, 8.0), List(w(0) * 5, w(0) * 8))
     f.saveas("t.png")
   }
 }
 
+//https://stats.stackexchange.com/questions/5056/comp1-0.000uting-the-decision-boundary-of-a-linear-svm-model
+class Svm(x: DataFrame[Double], labels: Vector[Int], eta: Double=1, epochs: Int=10000) {
 
-class Svm(x: DataFrame[Double], labels: Vector[Int], eta: Double = 1, epochs: Int = 10000) {
+  val df: DataFrame[Double] = x.map(_ :+ 1.0)
 
   // weights initialization
-  var w: Vector[Double] = 0.to(x(0).length).map(i => i * 0.0).toVector
+  var w: Vector[Double] = 0.to(df(0).length).map(i => i * 0.0).toVector
 
 
   def fit(): Unit = {
@@ -62,7 +65,7 @@ class Svm(x: DataFrame[Double], labels: Vector[Int], eta: Double = 1, epochs: In
 
     def trainEpochs(w: Vector[Double], epochs: Int, epochCount: Int = 1): Vector[Double] = epochs match {
       case 0 => w
-      case _ => trainEpochs(trainOneEpoch(w, x, labels, epochCount), epochs - 1, epochCount + 1)
+      case _ => trainEpochs(trainOneEpoch(w, df, labels, epochCount), epochs - 1, epochCount + 1)
     }
 
     w = trainEpochs(w, epochs)
@@ -72,8 +75,8 @@ class Svm(x: DataFrame[Double], labels: Vector[Int], eta: Double = 1, epochs: In
 
   println("Weigths", w)
 
-  println("Classification accuracy", (classification(x, w).map(_.signum), labels).zipped.count(i => i._1 == i._2).toDouble / x.length)
-  Plotter(x, labels)
+  println("Classification accuracy", (classification(df, w).map(_.signum), labels).zipped.count(i => i._1 == i._2).toDouble / x.length)
+  Plotter[Int, Vector](x, labels)
 
 
   // Misclassification treshold
