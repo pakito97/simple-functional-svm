@@ -1,10 +1,13 @@
 import breeze.plot._
+import global._
 
 object Main {
   def main(args: Array[String]): Unit = {
     val (df, labels) = Data.readCSV("./res/iris.csv")
 
     val svm = new Svm(df, labels)
+
+
   }
 }
 
@@ -27,18 +30,31 @@ object Data {
   }
 }
 
+object Plotter {
+  def apply(x: DataFrame[Double], labels: Vector[Int]): Unit = {
+    val f = Figure()
+    val p = f.subplot(0)
+
+    val x1 = (x, labels).zipped.filter((_, b) => b == -1)._1
+    val x2 = (x, labels).zipped.filter((_, b) => b == 1)._1
 
 
-class Svm(x: Vector[Vector[Double]], labels: Vector[Int], eta: Double = 1, epochs: Int = 10000) {
+    p += plot(x1.map(_.head), x1.map(_.last), '.', "b")
+    p += plot(x2.map(_.head), x2.map(_.last), '.', "r")
+//    p += plot(List( 5.0, 8.0), List(w(0) * 5, w(0) * 8))
+    f.saveas("t.png")
+  }
+}
+
+
+class Svm(x: DataFrame[Double], labels: Vector[Int], eta: Double = 1, epochs: Int = 10000) {
 
   // weights initialization
   var w: Vector[Double] = 0.to(x(0).length).map(i => i * 0.0).toVector
-  val currentepoch: Int = 1
 
 
   def fit(): Unit = {
-
-    def trainOneEpoch(w: Vector[Double], x: Vector[Vector[Double]], labels: Vector[Int], epoch: Int): Vector[Double] = (x, labels) match {
+    def trainOneEpoch(w: Vector[Double], x: DataFrame[Double], labels: Vector[Int], epoch: Int): Vector[Double] = (x, labels) match {
       case (xh +: xs, lh +: ls) if misClassification(xh, w, lh) => trainOneEpoch(updateWeightsIfWrong(w, xh, lh, epoch), xs, ls, epoch)
       case (_ +: xs, lh +: ls) => trainOneEpoch(regularization(w, lh, epoch), xs, ls, epoch) // if correct update regularization parameter
       case _ => w
@@ -54,13 +70,11 @@ class Svm(x: Vector[Vector[Double]], labels: Vector[Int], eta: Double = 1, epoch
   }
   fit()
 
-  println(w)
-  println((classification(x, w).map(_.signum), labels).zipped.count(i => i._1 == i._2).toDouble / x.length)
-  val f = Figure()
-  val p = f.subplot(0)
-  p += plot(x.map(_.head), x.map(_.last), '.')
-  p += plot(List(w(0) * 5, w(0) * 8), List(w.last * 1, w.last*3))
-  f.saveas("t.png")
+  println("Weigths", w)
+
+  println("Classification accuracy", (classification(x, w).map(_.signum), labels).zipped.count(i => i._1 == i._2).toDouble / x.length)
+  Plotter(x, labels)
+
 
   // Misclassification treshold
   def misClassification(x: Vector[Double], w: Vector[Double], label: Int): Boolean = {

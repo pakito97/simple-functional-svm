@@ -1,13 +1,10 @@
 val w = Vector(0.0, 0.0, 0.0, 0.0, 0.0)
-val x = Vector(7.0, 3.2, 4.7, 1.4)
+val x = Vector(7.0, 3.2, 4.7, 1.4, 5.0)
 
-val (y +: ys) = x
+def testFunc[T, V <: Seq[T]](x: V) = x
 
-ys
+testFunc(List(1, 3))
+testFunc(Vector(1, 3))
 
 
-def test(a: Vector[Double]): Double = a match {
-  case y +: ys => test(ys) + y
-  case _ => 0.0
-}
 
