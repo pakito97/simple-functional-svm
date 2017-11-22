@@ -6,7 +6,11 @@ object Main {
     val (df, labels) = Data.readCSV("./res/iris.csv")
 
     val svm = new Svm(df, labels)
+    svm.fit()
+    println("Weigths", svm.w)
+    println("Classification accuracy", (svm.classification(df).map(_.signum), labels).zipped.count(i => i._1 == i._2).toDouble / svm.df.length)
 
+    Plotter(svm.df, labels, svm.w)
 
   }
 }
@@ -16,9 +20,9 @@ object Data {
     val bufferedSource = scala.io.Source.fromFile(path)
 
     def flowerClass(v: String): Double = v.trim() match {
-      case "virginica" => -1
+      case "setosa" => -1
       case "versicolor" => 1
-      case "setosa" => 2
+      case "virginica" => 2
       case x => x.toDouble
     }
     val lines = bufferedSource.getLines.toVector.tail
@@ -26,37 +30,57 @@ object Data {
     val labels = rows.map(_.last.toInt)
     val data = rows.map(_.init)
     bufferedSource.close()
+
     (data, labels)
   }
 }
 
-object Plotter {
-  implicit def toVec[F <: Iterable[_]](x: F): Vector[_] = x.toVector
+object dotProduct {
+  def apply(x: Vector[Double], w: Vector[Double]): Double = (x, w).zipped.map((a, b) => a * b).sum
+}
 
-  def apply[T: Numeric, F[_] <: Iterable[_]](x: DataFrame[Double], labels: F[T]): Unit = {
+object Plotter {
+
+  def apply(x: DataFrame[Double], labels: Vector[Int], weights: Vector[Double]): Unit = {
     val f = Figure()
     val p = f.subplot(0)
 
     val x1 = (x, labels).zipped.filter((_, b) => b == -1)._1
     val x2 = (x, labels).zipped.filter((_, b) => b == 1)._1
 
-    p += plot(x1.map(_.head), x1.map(_.last), '.', "b")
-    p += plot(x2.map(_.head), x2.map(_.last), '.', "r")
-////    p += plot(List( 5.0, 8.0), List(w(0) * 5, w(0) * 8))
+    p += plot(x1.map(_(0)), x1.map(_(1)), '.', "b")
+    p += plot(x2.map(_(0)), x2.map(_(1)), '.', "r")
+
+    val sorted_x = x.sortWith((i1, i2) => i1(0) > i2(0))
+    val w_ = weights.patch(1, Vector(0.0), 1)
+    p += plot(sorted_x.map(_(0)), sorted_x.map(x => -dotProduct(x, w_) /  weights(1)))
     f.saveas("t.png")
   }
 }
 
-//https://stats.stackexchange.com/questions/5056/comp1-0.000uting-the-decision-boundary-of-a-linear-svm-model
 class Svm(x: DataFrame[Double], labels: Vector[Int], eta: Double=1, epochs: Int=10000) {
 
-  val df: DataFrame[Double] = x.map(_ :+ 1.0)
+  // Take 2 features
+  val df: DataFrame[Double] = x.map(i => Vector(i(0), i(1), 1))
 
   // weights initialization
   var w: Vector[Double] = 0.to(df(0).length).map(i => i * 0.0).toVector
 
 
   def fit(): Unit = {
+    def updateWeightsIfWrong(w: Vector[Double], data: Vector[Double], label: Int, epoch: Int): Vector[Double] = {
+      (w, data).zipped.map((w, d) => w + eta * ((d * label) + (-2 * (1 / epoch) * w)))
+    }
+
+    // Misclassification treshold
+    def misClassification(x: Vector[Double], w: Vector[Double], label: Int): Boolean = {
+      dotProduct(x, w) * label < 1
+    }
+
+    def regularization(w: Vector[Double], label: Int, epoch: Int): Vector[Double] = {
+      w.map(i => i + eta * (-2  * (1 / epoch) * i))
+    }
+
     def trainOneEpoch(w: Vector[Double], x: DataFrame[Double], labels: Vector[Int], epoch: Int): Vector[Double] = (x, labels) match {
       case (xh +: xs, lh +: ls) if misClassification(xh, w, lh) => trainOneEpoch(updateWeightsIfWrong(w, xh, lh, epoch), xs, ls, epoch)
       case (_ +: xs, lh +: ls) => trainOneEpoch(regularization(w, lh, epoch), xs, ls, epoch) // if correct update regularization parameter
@@ -71,31 +95,8 @@ class Svm(x: DataFrame[Double], labels: Vector[Int], eta: Double=1, epochs: Int=
     w = trainEpochs(w, epochs)
 
   }
-  fit()
 
-  println("Weigths", w)
-
-  println("Classification accuracy", (classification(df, w).map(_.signum), labels).zipped.count(i => i._1 == i._2).toDouble / x.length)
-  Plotter[Int, Vector](x, labels)
-
-
-  // Misclassification treshold
-  def misClassification(x: Vector[Double], w: Vector[Double], label: Int): Boolean = {
-    dotProduct(x, w) * label < 1
-  }
-
-  def classification(x: Vector[Vector[Double]], w: Vector[Double]): Vector[Double] = x.map(dotProduct(_, w))
-
-  def dotProduct(x: Vector[Double], w: Vector[Double]): Double = (x, w).zipped.map((a, b) => a * b).sum
-
-
-  def updateWeightsIfWrong(w: Vector[Double], data: Vector[Double], label: Int, epoch: Int): Vector[Double] = {
-    (w, data).zipped.map((w, d) => w + eta * ((d * label) + (-2 * (1 / epoch) * w)))
-  }
-
-  def regularization(w: Vector[Double], label: Int, epoch: Int): Vector[Double] = {
-    w.map(i => i + eta * (-2  * (1 / epoch) * i))
-  }
+  def classification(x: Vector[Vector[Double]], w: Vector[Double] = w): Vector[Double] = x.map(dotProduct(_, w))
 
 }
 
