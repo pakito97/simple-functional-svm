@@ -11,7 +11,8 @@ object Main {
     // train svm
     svm.fit()
 
-    println("Classification accuracy:", (svm.classification(svm.df), labels).zipped.count(i => i._1 == i._2).toDouble / svm.df.length)
+    println("Classification accuracy:",
+      (svm.classification(svm.df), labels).zipped.count(i => i._1 == i._2).toDouble / svm.df.length)
     println("Weigths:", svm.w)
 
     Plotter(svm.df, labels, svm.w)
@@ -55,10 +56,14 @@ object dotProduct {
 }
 
 object Plotter {
-
   def apply(x: DataFrame[Double], labels: Vector[Int], weights: Vector[Double]): Unit = {
     val f = Figure()
+    f.width = 800
+    f.height = 600
     val p = f.subplot(0)
+    p.title = "Decision boundary SVM"
+    p.xlabel = "x1"
+    p.ylabel = "x2"
 
     val x1 = (x, labels).zipped.filter((_, b) => b == -1)._1
     val x2 = (x, labels).zipped.filter((_, b) => b == 1)._1
